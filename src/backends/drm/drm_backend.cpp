@@ -436,7 +436,7 @@ void DrmBackend::readOutputsConfiguration(const QVector<DrmAbstractOutput*> &out
 {
     const auto outputsInfo = KWinKScreenIntegration::outputsConfig(outputs);
 
-    AbstractOutput *primaryOutput = m_outputs.constFirst();
+    AbstractWaylandOutput *primaryOutput = m_outputs.constFirst();
     WaylandOutputConfig cfg;
     // default position goes from left to right
     QPoint pos(0, 0);
@@ -475,6 +475,8 @@ void DrmBackend::readOutputsConfiguration(const QVector<DrmAbstractOutput*> &out
         }
         pos.setX(pos.x() + output->geometry().width());
     }
+    // the primary output must be enabled, no matter what the config says
+    cfg.changeSet(primaryOutput)->enabled = true;
     applyOutputChanges(cfg);
     setPrimaryOutput(primaryOutput);
 }
