@@ -13,10 +13,11 @@
 #include <QDBusConnectionInterface>
 #include <QDBusServiceWatcher>
 #include <QFile>
-#include <QSize>
-#include <QStyle>
-#include <QStandardPaths>
 #include <QPainter>
+#include <QSize>
+#include <QStandardPaths>
+#include <QStyle>
+#include <QTimer>
 // KDE
 #include <KConfigGroup>
 #include <KSharedConfig>
@@ -141,7 +142,8 @@ void StartupFeedbackEffect::reconfigure(Effect::ReconfigureFlags flags)
     const bool busyCursor = c.readEntry("BusyCursor", true);
 
     c = m_configWatcher->config()->group("BusyCursorSettings");
-    m_startupInfo->setTimeout(c.readEntry("Timeout", s_startupDefaultTimeout));
+    m_timeout = std::chrono::seconds(c.readEntry("Timeout", s_startupDefaultTimeout));
+    m_startupInfo->setTimeout(m_timeout.count());
     const bool busyBlinking = c.readEntry("Blinking", false);
     const bool busyBouncing = c.readEntry("Bouncing", true);
     if (!busyCursor)
@@ -262,6 +264,11 @@ void StartupFeedbackEffect::gotNewStartup(const QString &id, const QIcon &icon)
 {
     m_currentStartup = id;
     m_startups[ id ] = icon;
+
+    QTimer::singleShot(std::chrono::duration_cast<std::chrono::milliseconds>(m_timeout), [id] {
+        Q_EMIT effects->startupRemoved(id);
+    });
+
     start(icon);
 }
 

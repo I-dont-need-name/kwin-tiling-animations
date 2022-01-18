@@ -14,6 +14,8 @@
 #include <KStartupInfo>
 #include <KConfigWatcher>
 
+#include <chrono>
+
 class KSelectionOwner;
 namespace KWin
 {
@@ -80,6 +82,7 @@ private:
     int m_cursorSize;
     KConfigWatcher::Ptr m_configWatcher;
     bool m_splashVisible;
+    std::chrono::seconds m_timeout;
 };
 } // namespace
 
