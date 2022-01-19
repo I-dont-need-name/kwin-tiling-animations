@@ -478,7 +478,17 @@ void DrmBackend::readOutputsConfiguration(const QVector<DrmAbstractOutput*> &out
     }
     // the primary output must be enabled, no matter what the config says
     cfg.changeSet(primaryOutput)->enabled = true;
+    qCWarning(KWIN_DRM) << "---before---";
+    qCWarning(KWIN_DRM) << "primary output is" << primaryOutput;
+    for (const auto &o : qAsConst(outputs)) {
+        qCWarning(KWIN_DRM) << "output" << o << (o->isEnabled() ? "is" : "isn't") << "enabled";
+        qCWarning(KWIN_DRM) << "output" << o << (cfg.changeSet(o)->enabled ? "will" : "won't") << "be enabled";
+    }
     if (applyOutputChanges(cfg)) {
+        qCWarning(KWIN_DRM) << "---after---";
+        for (const auto &o : qAsConst(outputs)) {
+            qCWarning(KWIN_DRM) << "output" << o << (o->isEnabled() ? "is" : "isn't") << "enabled";
+        }
         setPrimaryOutput(primaryOutput);
     }
 }
@@ -489,6 +499,7 @@ void DrmBackend::enableOutput(DrmAbstractOutput *output, bool enable)
         return;
     }
     if (enable) {
+        qCWarning(KWIN_DRM) << "enabling output" << output;
         m_enabledOutputs << output;
         Q_EMIT output->gpu()->outputEnabled(output);
         Q_EMIT outputEnabled(output);
@@ -499,9 +510,14 @@ void DrmBackend::enableOutput(DrmAbstractOutput *output, bool enable)
             m_placeHolderOutput = nullptr;
         }
     } else {
+        qCWarning(KWIN_DRM) << "disabling output" << output;
         if (m_enabledOutputs.count() == 1 && m_outputs.count() > 1) {
             auto outputs = m_outputs;
             outputs.removeOne(output);
+            qCWarning(KWIN_DRM) << "disabling output" << output;
+            for (const auto &o : outputs) {
+                qCWarning(KWIN_DRM) << "remaining output" << o;
+            }
             readOutputsConfiguration(outputs);
         }
         if (m_enabledOutputs.count() == 1 && !kwinApp()->isTerminating()) {
