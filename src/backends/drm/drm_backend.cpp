@@ -477,8 +477,9 @@ void DrmBackend::readOutputsConfiguration(const QVector<DrmAbstractOutput*> &out
     }
     // the primary output must be enabled, no matter what the config says
     cfg.changeSet(primaryOutput)->enabled = true;
-    applyOutputChanges(cfg);
-    setPrimaryOutput(primaryOutput);
+    if (applyOutputChanges(cfg)) {
+        setPrimaryOutput(primaryOutput);
+    }
 }
 
 void DrmBackend::enableOutput(DrmAbstractOutput *output, bool enable)
