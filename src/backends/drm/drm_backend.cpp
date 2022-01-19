@@ -434,6 +434,7 @@ namespace KWinKScreenIntegration
 
 void DrmBackend::readOutputsConfiguration(const QVector<DrmAbstractOutput*> &outputs)
 {
+    Q_ASSERT(!outputs.isEmpty());
     const auto outputsInfo = KWinKScreenIntegration::outputsConfig(outputs);
 
     AbstractWaylandOutput *primaryOutput = m_outputs.constFirst();
@@ -498,7 +499,7 @@ void DrmBackend::enableOutput(DrmAbstractOutput *output, bool enable)
             m_placeHolderOutput = nullptr;
         }
     } else {
-        if (m_enabledOutputs.count() == 1) {
+        if (m_enabledOutputs.count() == 1 && m_outputs.count() > 1) {
             auto outputs = m_outputs;
             outputs.removeOne(output);
             readOutputsConfiguration(outputs);
