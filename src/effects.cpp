@@ -354,6 +354,9 @@ void EffectsHandlerImpl::setupClientConnections(AbstractClient* c)
     connect(c, &AbstractClient::visibleGeometryChanged, this, [this, c]() {
         Q_EMIT windowExpandedGeometryChanged(c->effectWindow());
     });
+    connect(c, &AbstractClient::quickTileModeChanged, this, [this, c]() {
+        Q_EMIT windowQuickTileModeChanged(c->effectWindow());
+    });
 }
 
 void EffectsHandlerImpl::setupUnmanagedConnections(Unmanaged* u)
