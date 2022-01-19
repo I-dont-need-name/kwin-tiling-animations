@@ -1810,6 +1810,11 @@ Q_SIGNALS:
      * This signal is emitted when the visible geometry of a window changed.
      */
     void windowExpandedGeometryChanged(KWin::EffectWindow *window);
+    
+    /**
+     * This signal is emitted when the quick tiling mode of a window changes or it is maximized.
+     */     
+    void windowQuickTileModeChanged(KWin::EffectWindow *w);
 
     void startupAdded(const QString &id, const QIcon &icon);
     void startupChanged(const QString &id, const QIcon &icon);
