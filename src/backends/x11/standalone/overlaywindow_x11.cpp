@@ -13,8 +13,8 @@
 #include "composite.h"
 #include "scene.h"
 #include "screens.h"
-#include "utils.h"
-#include "xcbutils.h"
+#include "utils/common.h"
+#include "utils/xcbutils.h"
 
 #include <QVector>
 

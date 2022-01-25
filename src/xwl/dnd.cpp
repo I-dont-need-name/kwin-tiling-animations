@@ -162,8 +162,9 @@ void Dnd::endDrag()
 {
     Q_ASSERT(m_currentDrag);
 
-    if (m_currentDrag->end()) {
+    if (qobject_cast<WlToXDrag*>(m_currentDrag)) {
         delete m_currentDrag;
+        setWlSource(nullptr);
     } else {
         connect(m_currentDrag, &Drag::finish, this, &Dnd::clearOldDrag);
         m_oldDrags << m_currentDrag;

@@ -8,7 +8,7 @@
 
 #include "eglonxbackend.h"
 #include "openglsurfacetexture_x11.h"
-#include "utils.h"
+#include "utils/common.h"
 
 #include <kwingltexture.h>
 #include <kwingltexture_p.h>
@@ -68,8 +68,8 @@ protected:
     void onDamage() override;
 
 private:
-    EglBackend *m_backend;
     EglPixmapTexture *q;
+    EglBackend *m_backend;
     EGLImageKHR m_image = EGL_NO_IMAGE_KHR;
 };
 

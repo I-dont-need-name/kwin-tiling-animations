@@ -28,11 +28,11 @@
 #include "surfaceitem_x11.h"
 #include "unmanaged.h"
 #include "useractions.h"
-#include "utils.h"
+#include "utils/common.h"
 #include "wayland_server.h"
 #include "workspace.h"
 #include "x11syncmanager.h"
-#include "xcbutils.h"
+#include "utils/xcbutils.h"
 
 #include <kwinglplatform.h>
 #include <kwingltexture.h>

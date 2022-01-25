@@ -10,18 +10,18 @@
 */
 #include "xdgshellclient.h"
 #include "abstract_wayland_output.h"
+#if KWIN_BUILD_ACTIVITIES
+#include "activities.h"
+#endif
 #include "decorations/decorationbridge.h"
 #include "deleted.h"
 #include "platform.h"
 #include "screenedge.h"
-#include "subsurfacemonitor.h"
+#include "touch_input.h"
+#include "utils/subsurfacemonitor.h"
 #include "virtualdesktops.h"
 #include "wayland_server.h"
 #include "workspace.h"
-#if KWIN_BUILD_ACTIVITIES
-#include "activities.h"
-#endif
-#include "touch_input.h"
 
 #include <KDecoration2/DecoratedClient>
 #include <KDecoration2/Decoration>
@@ -146,18 +146,23 @@ void XdgSurfaceClient::sendConfigure()
 
 void XdgSurfaceClient::handleConfigureAcknowledged(quint32 serial)
 {
-    while (!m_configureEvents.isEmpty()) {
-        if (serial < m_configureEvents.first()->serial) {
-            break;
-        }
-        m_lastAcknowledgedConfigure.reset(m_configureEvents.takeFirst());
-    }
+    m_lastAcknowledgedConfigureSerial = serial;
 }
 
 void XdgSurfaceClient::handleCommit()
 {
     if (!surface()->buffer()) {
         return;
+    }
+
+    if (m_lastAcknowledgedConfigureSerial.has_value()) {
+        const quint32 serial = m_lastAcknowledgedConfigureSerial.value();
+        while (!m_configureEvents.isEmpty()) {
+            if (serial < m_configureEvents.constFirst()->serial) {
+                break;
+            }
+            m_lastAcknowledgedConfigure.reset(m_configureEvents.takeFirst());
+        }
     }
 
     handleRolePrecommit();
@@ -168,6 +173,7 @@ void XdgSurfaceClient::handleCommit()
 
     handleRoleCommit();
     m_lastAcknowledgedConfigure.reset();
+    m_lastAcknowledgedConfigureSerial.reset();
 
     setReadyForPainting();
     updateDepth();
@@ -741,14 +747,11 @@ bool XdgToplevelClient::userCanSetNoBorder() const
 
 bool XdgToplevelClient::noBorder() const
 {
-    return m_userNoBorder || preferredDecorationMode() != DecorationMode::Server;
+    return m_userNoBorder;
 }
 
 void XdgToplevelClient::setNoBorder(bool set)
 {
-    if (!userCanSetNoBorder()) {
-        return;
-    }
     set = rules()->checkNoBorder(set);
     if (m_userNoBorder == set) {
         return;
@@ -1677,11 +1680,7 @@ void XdgToplevelClient::changeMaximize(bool horizontal, bool vertical, bool adju
     }
 
     if (options->borderlessMaximizedWindows()) {
-        // triggers a maximize change.
-        // The next setNoBorder interation will exit since there's no change but the first recursion pullutes the restore geometry
-        changeMaximizeRecursion = true;
-        setNoBorder(rules()->checkNoBorder(m_requestedMaximizeMode == MaximizeFull));
-        changeMaximizeRecursion = false;
+        setNoBorder(m_requestedMaximizeMode == MaximizeFull);
     }
 
     if (quickTileMode() == QuickTileMode(QuickTileFlag::None)) {

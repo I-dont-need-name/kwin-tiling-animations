@@ -10,7 +10,7 @@
 #include <abstract_client.h>
 #include "abstract_output.h"
 #include "cursor.h"
-#include "utils.h"
+#include "utils/common.h"
 #include "settings.h"
 #include <workspace.h>
 #include <config-kwin.h>
@@ -105,17 +105,6 @@ void Screens::setCount(int count)
     const int previous = m_count;
     m_count = count;
     Q_EMIT countChanged(previous, count);
-}
-
-int Screens::intersecting(const QRect &r) const
-{
-    int cnt = 0;
-    for (int i = 0; i < count(); ++i) {
-        if (geometry(i).intersects(r)) {
-            ++cnt;
-        }
-    }
-    return cnt;
 }
 
 int Screens::number(const QPoint &pos) const

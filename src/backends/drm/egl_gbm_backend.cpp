@@ -155,7 +155,6 @@ bool EglGbmBackend::resetOutput(Output &output)
         qCCritical(KWIN_DRM) << "Could not find a suitable format for output" << output.output;
         return false;
     }
-    output.current.format = gbmFormat.value();
     uint32_t format = gbmFormat.value().drmFormat;
     QVector<uint64_t> modifiers = output.output->supportedModifiers(format);
     const QSize size = output.output->bufferSize();
@@ -193,6 +192,7 @@ bool EglGbmBackend::resetOutput(Output &output)
     cleanupRenderData(output.old);
     output.old = output.current;
     output.current = {};
+    output.current.format = gbmFormat.value();
     output.current.gbmSurface = gbmSurface;
 
     if (!output.output->needsSoftwareTransformation())  {
@@ -349,6 +349,7 @@ QSharedPointer<DrmBuffer> EglGbmBackend::importFramebuffer(Output &output, const
     qCWarning(KWIN_DRM) << "all imports failed on output" << output.output;
     // try again with XRGB8888, the most universally supported basic format
     output.forceXrgb8888 = true;
+    renderingBackend()->setForceXrgb8888(output.output);
     return nullptr;
 }
 
@@ -632,6 +633,11 @@ void EglGbmBackend::updateBufferAge(Output &output, const QRegion &dirty)
 
 bool EglGbmBackend::scanout(AbstractOutput *drmOutput, SurfaceItem *surfaceItem)
 {
+    static bool valid;
+    static const bool directScanoutDisabled = qEnvironmentVariableIntValue("KWIN_DRM_NO_DIRECT_SCANOUT", &valid) == 1 && valid;
+    if (directScanoutDisabled) {
+        return false;
+    }
     Q_ASSERT(m_outputs.contains(drmOutput));
     SurfaceItemWayland *item = qobject_cast<SurfaceItemWayland *>(surfaceItem);
     if (!item) {
@@ -747,6 +753,12 @@ bool EglGbmBackend::scanout(AbstractOutput *drmOutput, SurfaceItem *surfaceItem)
         damage = output.output->geometry();
     }
     auto bo = QSharedPointer<DrmGbmBuffer>::create(m_gpu, importedBuffer, buffer);
+    if (!bo->bufferId()) {
+        // buffer can't actually be scanned out. Mesa is supposed to prevent this from happening
+        // in gbm_bo_import but apparently that doesn't always work
+        sendFeedback();
+        return false;
+    }
     // ensure that a context is current like with normal presentation
     makeCurrent();
     if (output.output->present(bo, damage)) {
@@ -860,6 +872,11 @@ bool EglGbmBackend::prefer10bpc() const
     static bool ok = false;
     static const int preferred = qEnvironmentVariableIntValue("KWIN_DRM_PREFER_COLOR_DEPTH", &ok);
     return !ok || preferred == 30;
+}
+
+void EglGbmBackend::setForceXrgb8888(DrmAbstractOutput *output) {
+    auto &o = m_outputs[output];
+    o.forceXrgb8888 = true;
 }
 
 bool operator==(const GbmFormat &lhs, const GbmFormat &rhs)

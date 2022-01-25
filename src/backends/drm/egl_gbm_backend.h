@@ -9,7 +9,7 @@
 #ifndef KWIN_EGL_GBM_BACKEND_H
 #define KWIN_EGL_GBM_BACKEND_H
 #include "abstract_egl_backend.h"
-#include "utils.h"
+#include "utils/common.h"
 
 #include <kwinglutils.h>
 
@@ -140,6 +140,8 @@ private:
     QMap<uint32_t, EGLConfig> m_configs;
 
     static EglGbmBackend *renderingBackend();
+
+    void setForceXrgb8888(DrmAbstractOutput *output);
 
     friend class EglGbmTexture;
 };

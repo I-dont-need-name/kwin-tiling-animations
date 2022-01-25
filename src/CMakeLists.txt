@@ -19,10 +19,15 @@ if (KWIN_BUILD_KCMS)
     add_subdirectory(kcmkwin)
 endif()
 
-set(kwin_SRCS
+add_library(kwin SHARED)
+set_target_properties(kwin PROPERTIES
+   VERSION ${PROJECT_VERSION}
+   SOVERSION ${PROJECT_VERSION_MAJOR}
+)
+
+target_sources(kwin PRIVATE
     3rdparty/xcursor.c
     abstract_client.cpp
-    abstract_opengl_context_attribute_builder.cpp
     abstract_output.cpp
     abstract_wayland_output.cpp
     activation.cpp
@@ -44,7 +49,6 @@ set(kwin_SRCS
     dpmsinputeventfilter.cpp
     effectloader.cpp
     effects.cpp
-    egl_context_attribute_builder.cpp
     events.cpp
     focuschain.cpp
     ftrace.cpp
@@ -115,7 +119,6 @@ set(kwin_SRCS
     shadow.cpp
     shadowitem.cpp
     sm.cpp
-    subsurfacemonitor.cpp
     surfaceitem.cpp
     surfaceitem_internal.cpp
     surfaceitem_wayland.cpp
@@ -128,7 +131,6 @@ set(kwin_SRCS
     udev.cpp
     unmanaged.cpp
     useractions.cpp
-    utils.cpp
     virtualdesktops.cpp
     virtualdesktopsdbustypes.cpp
     virtualkeyboard_dbus.cpp
@@ -145,7 +147,6 @@ set(kwin_SRCS
     x11client.cpp
     x11eventfilter.cpp
     x11syncmanager.cpp
-    xcbutils.cpp
     xcursortheme.cpp
     xdgactivationv1.cpp
     xdgshellclient.cpp
@@ -153,34 +154,6 @@ set(kwin_SRCS
     xkb.cpp
     xwaylandclient.cpp
     xwl/xwayland_interface.cpp
-)
-
-qt_add_dbus_adaptor(kwin_SRCS scripting/org.kde.kwin.Script.xml scripting/scripting.h KWin::AbstractScript)
-
-kconfig_add_kcfg_files(kwin_SRCS settings.kcfgc)
-kconfig_add_kcfg_files(kwin_SRCS rulesettings.kcfgc)
-kconfig_add_kcfg_files(kwin_SRCS rulebooksettingsbase.kcfgc)
-
-qt_add_dbus_adaptor(kwin_SRCS org.kde.KWin.xml dbusinterface.h KWin::DBusInterface)
-qt_add_dbus_adaptor(kwin_SRCS org.kde.kwin.Compositing.xml dbusinterface.h KWin::CompositorDBusInterface)
-qt_add_dbus_adaptor(kwin_SRCS ${kwin_effects_dbus_xml} effects.h KWin::EffectsHandlerImpl)
-qt_add_dbus_adaptor(kwin_SRCS org.kde.KWin.VirtualDesktopManager.xml dbusinterface.h KWin::VirtualDesktopManagerDBusInterface)
-qt_add_dbus_adaptor(kwin_SRCS org.kde.KWin.Session.xml sm.h KWin::SessionManager)
-qt_add_dbus_adaptor(kwin_SRCS org.kde.KWin.Plugins.xml dbusinterface.h KWin::PluginManagerDBusInterface)
-
-qt_add_dbus_interface(kwin_SRCS ${KSCREENLOCKER_DBUS_INTERFACES_DIR}/kf5_org.freedesktop.ScreenSaver.xml screenlocker_interface)
-qt_add_dbus_interface(kwin_SRCS ${KSCREENLOCKER_DBUS_INTERFACES_DIR}/org.kde.screensaver.xml kscreenlocker_interface)
-qt_add_dbus_interface(kwin_SRCS org.kde.kappmenu.xml appmenu_interface)
-
-ki18n_wrap_ui(kwin_SRCS
-    debug_console.ui
-    shortcutdialog.ui
-)
-
-add_library(kwin SHARED ${kwin_SRCS})
-set_target_properties(kwin PROPERTIES
-   VERSION ${PROJECT_VERSION}
-   SOVERSION ${PROJECT_VERSION_MAJOR}
 )
 
 target_link_libraries(kwin
@@ -231,8 +204,37 @@ target_link_libraries(kwin
     Threads::Threads
 )
 
+kconfig_add_kcfg_files(kwin
+    settings.kcfgc
+    rulesettings.kcfgc
+    rulebooksettingsbase.kcfgc
+)
+
+ki18n_wrap_ui(kwin
+    debug_console.ui
+    shortcutdialog.ui
+)
+
+set(kwin_dbus_SRCS)
+qt_add_dbus_adaptor(kwin_dbus_SRCS scripting/org.kde.kwin.Script.xml scripting/scripting.h KWin::AbstractScript)
+qt_add_dbus_adaptor(kwin_dbus_SRCS org.kde.KWin.xml dbusinterface.h KWin::DBusInterface)
+qt_add_dbus_adaptor(kwin_dbus_SRCS org.kde.kwin.Compositing.xml dbusinterface.h KWin::CompositorDBusInterface)
+qt_add_dbus_adaptor(kwin_dbus_SRCS ${kwin_effects_dbus_xml} effects.h KWin::EffectsHandlerImpl)
+qt_add_dbus_adaptor(kwin_dbus_SRCS org.kde.KWin.VirtualDesktopManager.xml dbusinterface.h KWin::VirtualDesktopManagerDBusInterface)
+qt_add_dbus_adaptor(kwin_dbus_SRCS org.kde.KWin.Session.xml sm.h KWin::SessionManager)
+qt_add_dbus_adaptor(kwin_dbus_SRCS org.kde.KWin.Plugins.xml dbusinterface.h KWin::PluginManagerDBusInterface)
+
+qt_add_dbus_interface(kwin_dbus_SRCS ${KSCREENLOCKER_DBUS_INTERFACES_DIR}/kf5_org.freedesktop.ScreenSaver.xml screenlocker_interface)
+qt_add_dbus_interface(kwin_dbus_SRCS ${KSCREENLOCKER_DBUS_INTERFACES_DIR}/org.kde.screensaver.xml kscreenlocker_interface)
+qt_add_dbus_interface(kwin_dbus_SRCS org.kde.kappmenu.xml appmenu_interface)
+
+target_sources(kwin PRIVATE
+    ${kwin_dbus_SRCS}
+)
+
 add_subdirectory(backends)
 add_subdirectory(scenes)
+add_subdirectory(utils)
 
 if (KWIN_BUILD_CMS)
     target_sources(kwin PRIVATE

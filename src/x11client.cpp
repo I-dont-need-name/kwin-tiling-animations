@@ -213,17 +213,19 @@ X11Client::X11Client()
     connect(options, &Options::configChanged, this, &X11Client::updateMouseGrab);
     connect(options, &Options::condensedTitleChanged, this, &X11Client::updateCaption);
 
-    connect(this, &X11Client::moveResizeCursorChanged, this, [this] (CursorShape cursor) {
-        xcb_cursor_t nativeCursor = Cursors::self()->mouse()->x11Cursor(cursor);
-        m_frame.defineCursor(nativeCursor);
-        if (m_decoInputExtent.isValid())
-            m_decoInputExtent.defineCursor(nativeCursor);
-        if (isInteractiveMoveResize()) {
-            // changing window attributes doesn't change cursor if there's pointer grab active
-            xcb_change_active_pointer_grab(connection(), nativeCursor, xTime(),
-                XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW);
-        }
-    });
+    if (kwinApp()->operationMode() == Application::OperationModeX11) {
+        connect(this, &X11Client::moveResizeCursorChanged, this, [this] (CursorShape cursor) {
+            xcb_cursor_t nativeCursor = Cursors::self()->mouse()->x11Cursor(cursor);
+            m_frame.defineCursor(nativeCursor);
+            if (m_decoInputExtent.isValid())
+                m_decoInputExtent.defineCursor(nativeCursor);
+            if (isInteractiveMoveResize()) {
+                // changing window attributes doesn't change cursor if there's pointer grab active
+                xcb_change_active_pointer_grab(connection(), nativeCursor, xTime(),
+                    XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW);
+            }
+        });
+    }
 
     // SELI TODO: Initialize xsizehints??
 }
@@ -1041,9 +1043,13 @@ void X11Client::updateInputWindow()
     if (!Xcb::Extensions::self()->isShapeInputAvailable())
         return;
 
+    if (kwinApp()->operationMode() != Application::OperationModeX11) {
+        return;
+    }
+
     QRegion region;
 
-    if (!noBorder() && isDecorated()) {
+    if (decoration()) {
         const QMargins &r = decoration()->resizeOnlyBorders();
         const int left   = r.left();
         const int top    = r.top();
@@ -1099,7 +1105,6 @@ void X11Client::updateDecoration(bool check_workspace_pos, bool force)
             ((!isDecorated() && noBorder()) || (isDecorated() && !noBorder())))
         return;
     QRect oldgeom = frameGeometry();
-    QRect oldClientGeom = oldgeom.adjusted(borderLeft(), borderTop(), -borderRight(), -borderBottom());
     blockGeometryUpdates(true);
     if (force)
         destroyDecoration();
@@ -1109,7 +1114,7 @@ void X11Client::updateDecoration(bool check_workspace_pos, bool force)
         destroyDecoration();
     updateShadow();
     if (check_workspace_pos)
-        checkWorkspacePosition(oldgeom, oldClientGeom);
+        checkWorkspacePosition(oldgeom);
     updateInputWindow();
     blockGeometryUpdates(false);
     updateFrameExtents();
@@ -1318,7 +1323,7 @@ void X11Client::updateShape()
             noborder = rules()->checkNoBorder(true);
             updateDecoration(true);
         }
-        if (noBorder()) {
+        if (!isDecorated()) {
             xcb_shape_combine(connection(), XCB_SHAPE_SO_SET, XCB_SHAPE_SK_BOUNDING, XCB_SHAPE_SK_BOUNDING,
                               frameId(), clientPos().x(), clientPos().y(), window());
         }
@@ -1486,7 +1491,7 @@ QRect X11Client::iconGeometry() const
 
 bool X11Client::isShadeable() const
 {
-    return !isSpecialWindow() && !noBorder() && (rules()->checkShade(ShadeNormal) != rules()->checkShade(ShadeNone));
+    return !isSpecialWindow() && isDecorated() && (rules()->checkShade(ShadeNormal) != rules()->checkShade(ShadeNone));
 }
 
 void X11Client::doSetShade(ShadeMode previousShadeMode)
@@ -4513,28 +4518,31 @@ QRect X11Client::fullscreenMonitorsArea(NETFullscreenMonitors requestedTopology)
 
 bool X11Client::doStartInteractiveMoveResize()
 {
-    bool has_grab = false;
-    // This reportedly improves smoothness of the moveresize operation,
-    // something with Enter/LeaveNotify events, looks like XFree performance problem or something *shrug*
-    // (https://lists.kde.org/?t=107302193400001&r=1&w=2)
-    QRect r = workspace()->clientArea(FullArea, this);
-    m_moveResizeGrabWindow.create(r, XCB_WINDOW_CLASS_INPUT_ONLY, 0, nullptr, rootWindow());
-    m_moveResizeGrabWindow.map();
-    m_moveResizeGrabWindow.raise();
-    updateXTime();
-    const xcb_grab_pointer_cookie_t cookie = xcb_grab_pointer_unchecked(connection(), false, m_moveResizeGrabWindow,
-        XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION |
-        XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW,
-        XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC, m_moveResizeGrabWindow, Cursors::self()->mouse()->x11Cursor(cursor()), xTime());
-    ScopedCPointer<xcb_grab_pointer_reply_t> pointerGrab(xcb_grab_pointer_reply(connection(), cookie, nullptr));
-    if (!pointerGrab.isNull() && pointerGrab->status == XCB_GRAB_STATUS_SUCCESS) {
-        has_grab = true;
-    }
-    if (!has_grab && grabXKeyboard(frameId()))
-        has_grab = move_resize_has_keyboard_grab = true;
-    if (!has_grab) { // at least one grab is necessary in order to be able to finish move/resize
-        m_moveResizeGrabWindow.reset();
-        return false;
+    if (kwinApp()->operationMode() == Application::OperationModeX11) {
+        bool has_grab = false;
+        // This reportedly improves smoothness of the moveresize operation,
+        // something with Enter/LeaveNotify events, looks like XFree performance problem or something *shrug*
+        // (https://lists.kde.org/?t=107302193400001&r=1&w=2)
+        QRect r = workspace()->clientArea(FullArea, this);
+        m_moveResizeGrabWindow.create(r, XCB_WINDOW_CLASS_INPUT_ONLY, 0, nullptr, rootWindow());
+        m_moveResizeGrabWindow.map();
+        m_moveResizeGrabWindow.raise();
+        updateXTime();
+        const xcb_grab_pointer_cookie_t cookie = xcb_grab_pointer_unchecked(connection(), false, m_moveResizeGrabWindow,
+            XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION |
+            XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW,
+            XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC, m_moveResizeGrabWindow, Cursors::self()->mouse()->x11Cursor(cursor()), xTime());
+        ScopedCPointer<xcb_grab_pointer_reply_t> pointerGrab(xcb_grab_pointer_reply(connection(), cookie, nullptr));
+        if (!pointerGrab.isNull() && pointerGrab->status == XCB_GRAB_STATUS_SUCCESS) {
+            has_grab = true;
+        }
+        if (!has_grab && grabXKeyboard(frameId())) {
+            has_grab = move_resize_has_keyboard_grab = true;
+        }
+        if (!has_grab) { // at least one grab is necessary in order to be able to finish move/resize
+            m_moveResizeGrabWindow.reset();
+            return false;
+        }
     }
     return true;
 }
@@ -4548,11 +4556,14 @@ void X11Client::leaveInteractiveMoveResize()
     }
     if (!isInteractiveResize())
         sendSyntheticConfigureNotify(); // tell the client about it's new final position
-    if (move_resize_has_keyboard_grab)
-        ungrabXKeyboard();
-    move_resize_has_keyboard_grab = false;
-    xcb_ungrab_pointer(connection(), xTime());
-    m_moveResizeGrabWindow.reset();
+    if (kwinApp()->operationMode() == Application::OperationModeX11) {
+        if (move_resize_has_keyboard_grab) {
+            ungrabXKeyboard();
+        }
+        move_resize_has_keyboard_grab = false;
+        xcb_ungrab_pointer(connection(), xTime());
+        m_moveResizeGrabWindow.reset();
+    }
     AbstractClient::leaveInteractiveMoveResize();
 }
 
